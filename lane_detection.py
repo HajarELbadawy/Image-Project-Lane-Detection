@@ -1,4 +1,9 @@
-
+import picamera
+from picamera.array import PiRGBArray
+import numpy as np
+import cv2
+import time
+import warnings
 warnings.filterwarnings('error')
 
 image_size=(320, 192)
@@ -57,17 +62,19 @@ class Lines():
         self.enlarge = 2.5
         # warning from numpy polyfit
         self.poly_warning = False
-#  perspective transform
+
+        
+        # transform perspective
     def trans_per(self, image):
 
         image = self.binary_extraction(image)
-#set self.binary_image = combined image to use it later
+        #set self.binary_image = combined image to use it later
         self.binary_image = image
-#save the image size
+        #save the image size
         ysize = image.shape[0]
         xsize = image.shape[1]
 
-# define region of interest(we need to find (top left ,top right ,bottom left , bottom right) points to find the area that contain the lane lines. 
+        # define region of interest(we need to find (top left ,top right ,bottom left , bottom right) points to find the area that contain the lane lines. 
         left_bottom = (xsize/10, ysize)
         #left_bottom if the size is 400*600 400 is x axis so we will start from pixel 40 &600 
         #why we do this ? because the image resolution will decrease due to the camera range  
@@ -82,17 +89,17 @@ class Lines():
         right_bottom = (xsize - xsize/10, ysize)
         #right_bottom if the size is 400*600 400 is x axis so we will end to the pixel (400-40) &600 from the left bottom to the end of the image
 
-# define vertices for perspective transformation
+        # define vertices for perspective transformation
         src = np.array([[left_bottom], [apex_l], [apex_r], [right_bottom]], dtype=np.float32)
         dst = np.float32([[xsize/3,ysize],[xsize/4.5,0],[xsize-xsize/4.5,0],[xsize-xsize/3, ysize]])
-#cv2.getPerspectiveTransform ==>given the source vertices array and the dis. vertices array to find the new matrix that we will use it on the source 
-#image to get the bied eye 
+        #cv2.getPerspectiveTransform ==>given the source vertices array and the dis. vertices array to find the new matrix that we will use it on the source 
+        #image to get the bied eye 
         self.M = cv2.getPerspectiveTransform(src, dst)
         
         self.Minv = cv2.getPerspectiveTransform(dst, src)
 
         if len(image.shape) > 2:
-# cv2.warpPerspective==>to get the wraped image given :source image ,transformation matrix ,shape of the new image (wraped)         
+        # cv2.warpPerspective==>to get the wraped image given :source image ,transformation matrix ,shape of the new image (wraped)         
             warped = cv2.warpPerspective(image, self.M, image.shape[-2:None:-1], flags=cv2.INTER_LINEAR)
         else:
             warped = cv2.warpPerspective(image, self.M, image.shape[-1:None:-1], flags=cv2.INTER_LINEAR)
