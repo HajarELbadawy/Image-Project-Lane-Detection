@@ -104,3 +104,142 @@ class Lines():
         else:
             warped = cv2.warpPerspective(image, self.M, image.shape[-1:None:-1], flags=cv2.INTER_LINEAR)
         return warped
+
+    
+    # Draw polynomials on the extracted left and right lane 
+    def get_fit(self, image):
+        # If the lanes are not detected in last iteration we will search for them
+        if not self.detected:
+            # initaizlize window settings to search for lanes
+            window_width = 40
+            window_height = 40 # will result in 9 windows vertically because image size is 720
+            margin = 10 # how much to slide left and right for searching
+
+            #This function will return left points and right points of windows 
+            window_centroids = self.find_window_centroids(image, window_width, window_height, margin)
+            # if we found any window centers
+            if len(window_centroids) > 0:
+                # points used to draw all the left and right windows
+                l_points = np.zeros_like(image)
+                r_points = np.zeros_like(image)
+                # go through each level and draw the windows
+                for level in range(0,len(window_centroids)):
+                    # Window_mask is a function to draw window areas
+                    l_mask = self.window_mask(window_width,window_height,image,window_centroids[level][0],level)
+                    r_mask = self.window_mask(window_width,window_height,image,window_centroids[level][1],level)
+                    # Add graphic points from window mask here to total pixels found
+                    l_points[(image == 1) & (l_mask == 1) ] = 1
+                    r_points[(image == 1) & (r_mask == 1) ] = 1
+
+                # construct images of the results
+                template_l = np.array(l_points*255,np.uint8) # add left window pixels
+                template_r = np.array(r_points*255,np.uint8) # add right window pixels
+                zero_channel = np.zeros_like(template_l) # create a zero color channel
+                left_right = np.array(cv2.merge((template_l,zero_channel,template_r)),np.uint8) # make color image left and right lane
+
+                # get points for polynomial fit
+                self.allyl,self.allxl = l_points.nonzero()
+                self.allyr,self.allxr = r_points.nonzero()
+
+
+                # check if lanes are detected
+                if (len(self.allxl)>0) & (len(self.allxr)>0):
+                    try:
+                        self.current_fit_l = np.polyfit(self.allyl,self.allxl, 2)
+                        self.current_fit_r = np.polyfit(self.allyr,self.allxr, 2)
+                        self.poly_warning = False
+                    except np.RankWarning:
+                        self.poly_warning = True
+                        pass
+
+                    # check if lanes are detected correctly
+                    if self.check_fit():
+                        self.detected = True
+
+                        # if this is the first detection initialize the best values
+                        if not self.detected_first:
+                            self.best_fit_l = self.current_fit_l
+                            self.best_fit_r = self.current_fit_r
+                        # if not then average with new
+                        else:
+                            self.best_fit_l = self.best_fit_l*0.6 + self.current_fit_l * 0.4
+                            self.best_fit_r = self.best_fit_r*0.6 + self.current_fit_r * 0.4
+
+                        # assign new best values based on this iteration
+                        self.detected_first = True
+                        self.bestxl = self.allxl
+                        self.bestyl = self.allyl
+                        self.bestxr = self.allxr
+                        self.bestyr = self.allyr
+                        self.left_right = left_right
+
+                    # set flag if lanes are not detected correctly
+                    else:
+                        self.detected = False
+
+        # if lanes were detected in the last frame, search area for current frame
+        else:
+            non_zero_y, non_zero_x = image.nonzero()
+
+            margin = 10 # search area margin
+            left_lane_points_indx = ((non_zero_x > (self.best_fit_l[0]*(non_zero_y**2) + self.best_fit_l[1]*non_zero_y + self.best_fit_l[2] - margin)) & (non_zero_x < (self.best_fit_l[0] *(non_zero_y**2) + self.best_fit_l[1]*non_zero_y + self.best_fit_l[2] + margin)))
+            right_lane_points_indx = ((non_zero_x > (self.best_fit_r[0]*(non_zero_y**2) + self.best_fit_r[1]*non_zero_y + self.best_fit_r[2] - margin)) & (non_zero_x < (self.best_fit_r[0]*(non_zero_y**2) + self.best_fit_r[1]*non_zero_y + self.best_fit_r[2] + margin)))
+
+            # extracted lef lane pixels
+            self.allxl= non_zero_x[left_lane_points_indx]
+            self.allyl= non_zero_y[left_lane_points_indx]
+
+            # extracted rightt lane pixels
+            self.allxr= non_zero_x[right_lane_points_indx]
+            self.allyr= non_zero_y[right_lane_points_indx]
+
+            # if lines were found
+            if (len(self.allxl)>0) & (len(self.allxr)>0):
+                try:
+                    self.current_fit_l = np.polyfit(self.allyl,self.allxl, 2)
+                    self.current_fit_r = np.polyfit(self.allyr,self.allxr, 2)
+                except np.RankWarning:
+                    self.poly_warning = True
+                    pass
+
+                # check if lanes are detected correctly
+                if self.check_fit():
+                    # average out the best fit with new values
+                    self.best_fit_l = self.best_fit_l*0.6 + self.current_fit_l * 0.4
+                    self.best_fit_r = self.best_fit_r*0.6 + self.current_fit_r * 0.4
+
+                    # assign new best values based on this iteration
+                    self.bestxl = self.allxl
+                    self.bestyl = self.allyl
+                    self.bestxr = self.allxr
+                    self.bestyr = self.allyr
+
+                    # construct images of the results
+                    template_l = np.copy(image).astype(np.uint8)
+                    template_r = np.copy(image).astype(np.uint8)
+
+                    template_l[non_zero_y[left_lane_points_indx],non_zero_x[left_lane_points_indx]] = 255 # add left window pixels
+                    template_r[non_zero_y[right_lane_points_indx],non_zero_x[right_lane_points_indx]] = 255 # add right window pixels
+                    zero_channel = np.zeros_like(template_l) # create a zero color channel
+                    self.left_right = np.array(cv2.merge((template_l,zero_channel,template_r)),np.uint8) # make color image left and right lane
+
+                # set flag if lanes are not detected correctly
+                else:
+                    self.detected = False
+
+    # check if lanes are detected correctly
+    def check_fit(self):
+        # Generate x and y values of the fit
+        ploty = np.linspace(0, self.im_shape[0]-1, self.im_shape[0])
+        left_fitx = self.current_fit_l[0]*ploty**2 + self.current_fit_l[1]*ploty + self.current_fit_l[2]
+        right_fitx = self.current_fit_r[0]*ploty**2 + self.current_fit_r[1]*ploty + self.current_fit_r[2]
+
+        # find max, min and mean distance between the lanes
+        max_dist  = np.amax(np.abs(right_fitx - left_fitx))
+        min_dist  = np.amin(np.abs(right_fitx - left_fitx))
+        mean_dist = np.mean(np.abs(right_fitx - left_fitx))
+        # check if the lanes don't have a big deviation from the mean
+        if (max_dist > 250) |  (np.abs(max_dist - mean_dist)> 100) | (np.abs(mean_dist - min_dist) > 100) | (mean_dist<50) | self.poly_warning:
+            return False
+        else:
+            return True
