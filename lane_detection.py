@@ -72,7 +72,62 @@ class Lines():
     def undistort(self, img):
         return cv2.undistort(img, self.cam_mtx, self.cam_dst, None,self.cam_mtx)
         
-        # transform perspective
+    # get binary image based on color thresholding
+    def color_thresh(self, img, thresh=(0, 255)):
+        # convert to HSV color space and separate the V channel
+        hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HLS).astype(np.float)
+        s_channel = hsv[:,:,2]
+
+        # threshold color channel
+        s_binary = np.zeros_like(s_channel)
+        s_binary[(s_channel >= thresh[0]) & (s_channel <= thresh[1])] = 1
+        return s_binary
+
+    # get binary image based on sobel gradient thresholding
+    def abs_sobel_thresh(self, sobel, thresh=(0, 255)):
+
+        abs_sobel = np.absolute(sobel)
+
+        max_s = np.max(abs_sobel)
+        if max_s == 0:
+            max_s=1
+
+        scaled_sobel = np.uint8(255*abs_sobel/max_s)
+
+        sbinary = np.zeros_like(scaled_sobel)
+        sbinary[(scaled_sobel >= thresh[0]) & (scaled_sobel <= thresh[1])] = 1
+
+        return sbinary
+
+    # get binary image based on sobel magnitude gradient thresholding
+    def mag_thresh(self, sobelx, sobely, mag_thresh=(0, 255)):
+
+        abs_sobel = np.sqrt(sobelx**2 + sobely**2)
+
+        max_s = np.max(abs_sobel)
+        if max_s == 0:
+            max_s=1
+
+        scaled_sobel = np.uint8(255*abs_sobel/max_s)
+
+        sbinary = np.zeros_like(scaled_sobel)
+        sbinary[(scaled_sobel >= mag_thresh[0]) & (scaled_sobel <= mag_thresh[1])] = 1
+
+        return sbinary
+
+    # get binary image based on directional gradient thresholding
+    def dir_threshold(self, sobelx, sobely, thresh=(0, np.pi/2)):
+
+        abs_sobelx = np.abs(sobelx)
+        abs_sobely = np.abs(sobely)
+        grad_sobel = np.arctan2(abs_sobely, abs_sobelx)
+
+        sbinary = np.zeros_like(grad_sobel)
+        sbinary[(grad_sobel >= thresh[0]) & (grad_sobel <= thresh[1])] = 1
+
+        return sbinary
+
+    # transform perspective
     def trans_per(self, image):
 
         image = self.binary_extraction(image)
