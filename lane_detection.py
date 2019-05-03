@@ -63,6 +63,14 @@ class Lines():
         # warning from numpy polyfit
         self.poly_warning = False
 
+    # set camera calibration parameters
+    def set_cam_calib_param(self, mtx, dst):
+        self.cam_mtx = mtx
+        self.cam_dst = dst
+
+    # undistort image
+    def undistort(self, img):
+        return cv2.undistort(img, self.cam_mtx, self.cam_dst, None,self.cam_mtx)
         
         # transform perspective
     def trans_per(self, image):
