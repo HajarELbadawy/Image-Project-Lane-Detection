@@ -127,6 +127,28 @@ class Lines():
 
         return sbinary
 
+    # get binary combining various thresholding methods
+    def binary_extraction(self,image, ksize=3):
+        # undistort first
+        image = self.undistort(image)
+
+        color_bin = self.color_thresh(image,thresh=(90, 150))              # initial values 110, 255
+
+        gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+
+        sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize)
+        sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize)
+
+        gradx = self.abs_sobel_thresh(sobelx, thresh=(100, 190))             # initial values 40, 160
+        grady = self.abs_sobel_thresh(sobely, thresh=(100, 190))             # initial values 40, 160
+        mag_binary = self.mag_thresh(sobelx, sobely, mag_thresh=(100, 190))  # initial values 40, 160
+
+        combined = np.zeros_like(gradx)
+        combined[(((gradx == 1) & (grady == 1)) | (mag_binary == 1)) | (color_bin==1) ] = 1
+        
+
+        return combined
+
     # transform perspective
     def trans_per(self, image):
 
