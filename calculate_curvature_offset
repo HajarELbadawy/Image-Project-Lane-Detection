@@ -1,0 +1,47 @@
+def calculate_curvature_offset(self):
+
+        if self.detected_first:
+            # define y value near the car
+            y_eval = self.im_shape[0]
+
+            # define conversions in x and y from pixels space to meters
+            ym_per_pix = 50/250 # meters per pixel in y dimension
+            xm_per_pix = 3.7/75 # meters per pixel in x dimension
+
+            # create new polynomials to x,y in world space
+
+//polynomial regression make a function of x and y
+ 
+            try:
+                left_fit_cr = np.polyfit(self.bestyl*ym_per_pix, self.bestxl*xm_per_pix, 2)
+                right_fit_cr = np.polyfit(self.bestyr*ym_per_pix, self.bestxr*xm_per_pix, 2)
+            except np.RankWarning:
+                 self.poly_warning = True
+                 pass
+
+            # if the poly fit is ok proceed
+            if not self.poly_warning:
+                # calculate the new radii of curvature
+                left_curverad = ((1 + (2*left_fit_cr[0]*y_eval*ym_per_pix + left_fit_cr[1])**2)**1.5) / np.absolute(2*left_fit_cr[0])
+                right_curverad = ((1 + (2*right_fit_cr[0]*y_eval*ym_per_pix + right_fit_cr[1])**2)**1.5) / np.absolute(2*right_fit_cr[0])
+                # now our radius of curvature is in meters
+
+                # calculate the offset from the center of the road
+                y_eval = y_eval*ym_per_pix
+                midpoint_car = self.im_shape[1]/2.0
+                midpoint_lane =(right_fit_cr[0]*(y_eval**2) + right_fit_cr[1]*y_eval + right_fit_cr[2]) + \
+                               (left_fit_cr[0]*(y_eval**2) + left_fit_cr[1]*y_eval + left_fit_cr[2])
+
+                offset = midpoint_car*xm_per_pix - midpoint_lane/2
+
+                # initialize the curvature and offset if this is the first detection
+                if self.left_curverad == None:
+                    self.left_curverad = left_curverad
+                    self.right_curverad = right_curverad
+                    self.offset = offset
+
+                # average out the curvature and offset
+                else:
+                    self.left_curverad = self.left_curverad * 0.8 + left_curverad*0.2
+                    self.right_curverad = self.right_curverad * 0.8 + right_curverad*0.2
+                    self.offset = self.offset * 0.9 + offset*0.1
