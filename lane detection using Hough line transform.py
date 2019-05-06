@@ -18,6 +18,7 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
     #lines: A vector that stores the parameters (x_{start}, y_{start}, x_{end}, y_{end}) of the detected lines from haugh
        for x in range(0, len(lines)):
            for x1,y1,x2,y2 in lines[x]:
+            # lines of x contain (x_{start}, y_{start}, x_{end}, y_{end}) of the detected lines 
                cv2.line(image,(x1,y1),(x2,y2),(0,255,0),2)
                #math.atan2((y2-y1),(x2-x1)) to find the slope of the line or theta 
                theta=theta+math.atan2((y2-y1),(x2-x1))
