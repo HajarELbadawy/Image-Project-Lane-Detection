@@ -482,7 +482,7 @@ class Lines():
             return_image = cv2.resize(np.hstack((image_input,cv2.resize(np.zeros_like(image_input),(0,0), fx=0.5, fy=1.0))),(0,0), fx=self.enlarge, fy=self.enlarge)
             return return_image 
         
-        lines = Lines()
+lines = Lines()
 lines.look_ahead = 10
 lines.remove_pixels = 100
 lines.enlarge = 2.25
