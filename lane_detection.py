@@ -417,3 +417,67 @@ class Lines():
                     self.left_curverad = self.left_curverad * 0.8 + left_curverad*0.2
                     self.right_curverad = self.right_curverad * 0.8 + right_curverad*0.2
                     self.offset = self.offset * 0.9 + offset*0.1
+
+
+    # project results on the source image
+    def project_on_road_debug(self, image_input):
+        image = image_input[self.remove_pixels:, :]
+        image = self.trans_per(image)
+        self.im_shape = image.shape
+        self.get_fit(image)
+
+        if self.detected_first & self.detected:
+            # create fill image
+            temp_filler = np.zeros((self.remove_pixels,self.im_shape[1])).astype(np.uint8)
+            filler = np.dstack((temp_filler,temp_filler,temp_filler))
+
+            # create an image to draw the lines on
+            warp_zero = np.zeros_like(image).astype(np.uint8)
+            color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+
+            ploty = np.linspace(0, image_input.shape[0]-1, image_input.shape[0] )
+            left_fitx = self.best_fit_l[0]*ploty**2 + self.best_fit_l[1]*ploty + self.best_fit_l[2]
+            right_fitx = self.best_fit_r[0]*ploty**2 + self.best_fit_r[1]*ploty + self.best_fit_r[2]
+
+            # recast the x and y points into usable format for cv2.fillPoly()
+            pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
+            pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+            pts = np.hstack((pts_left, pts_right))
+
+            # draw the lane onto the warped blank image
+            cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
+
+            # warp the blank back to original image space using inverse perspective matrix (Minv)
+            newwarp = cv2.warpPerspective(color_warp, self.Minv, color_warp.shape[-2:None:-1])
+            left_right = cv2.warpPerspective(self.left_right, self.Minv, color_warp.shape[-2:None:-1])
+            # combine the result with the original image
+            left_right_fill = np.vstack((filler,left_right)) 
+            result = cv2.addWeighted(left_right_fill,1, image_input, 1, 0)
+            result = cv2.addWeighted(result, 1, np.vstack((filler,newwarp)), 0.3, 0)
+
+            # get curvature and offset
+            self.calculate_curvature_offset()
+
+            # plot text on resulting image
+            img_text = "radius of curvature: " + str(round((self.left_curverad + self.right_curverad)/2,2)) + ' (m)'
+
+            if self.offset< 0:
+                img_text2 = "vehicle is: " + str(round(np.abs(self.offset),2)) + ' (m) left of center'
+            else:
+                img_text2 = "vehicle is: " + str(round(np.abs(self.offset),2)) + ' (m) right of center'
+
+            small = cv2.resize(left_right_fill, (0,0), fx=0.5, fy=0.5)
+            small2 = cv2.resize(np.vstack((filler,self.left_right)), (0,0), fx=0.5, fy=0.5)
+
+            result2 = cv2.resize(np.hstack((result, np.vstack((small2,small)))), (0,0), fx=self.enlarge, fy=self.enlarge)
+            #result2 = cv2.resize(np.hstack((np.vstack((filler,np.dstack((self.binary_image*255,self.binary_image*255,self.binary_image*255)))), np.vstack((small2,small)))), (0,0), fx=self.enlarge, fy=self.enlarge)
+
+            cv2.putText(result2,img_text, (15,15), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255),1)
+            cv2.putText(result2,img_text2,(15,40), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255),1)
+
+            return result2 
+
+        # if lanes were not detected output source image
+        else:
+            return_image = cv2.resize(np.hstack((image_input,cv2.resize(np.zeros_like(image_input),(0,0), fx=0.5, fy=1.0))),(0,0), fx=self.enlarge, fy=self.enlarge)
+            return return_image 
