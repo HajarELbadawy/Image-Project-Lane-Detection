@@ -481,3 +481,27 @@ class Lines():
         else:
             return_image = cv2.resize(np.hstack((image_input,cv2.resize(np.zeros_like(image_input),(0,0), fx=0.5, fy=1.0))),(0,0), fx=self.enlarge, fy=self.enlarge)
             return return_image 
+        
+        lines = Lines()
+lines.look_ahead = 10
+lines.remove_pixels = 100
+lines.enlarge = 2.25
+# capture frames from the camera
+for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+        # grab the raw NumPy array representing the image, then initialize the timestamp
+        # and occupied/unoccupied text
+        image = frame.array
+        
+        # show the frame
+        #lines.project_on_road_debug(image)
+        cv2.imshow("Rpi lane detection", lines.project_on_road_debug(image))
+        key = cv2.waitKey(1) & 0xFF
+
+        # clear the stream in preparation for the next frame
+        rawCapture.truncate()
+        rawCapture.seek(0)
+
+        # if the `q` key was pressed, break from the loop
+        if key == ord("q"):
+                break
+        
